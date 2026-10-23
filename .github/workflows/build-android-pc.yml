@@ -1,1 +1,188 @@
+name: Build TVMovies Android y PC
 
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Compilar APK Android
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - variant: mobile
+            app_name: TVMovies
+            app_id: com.tvmovies.mobile
+            url: https://playtvmoviesformobile.duckdns.org/
+
+          - variant: tv
+            app_name: TVMovies TV
+            app_id: com.tvmovies.tv
+            url: https://playtvmoviesfortv.duckdns.org/
+
+    steps:
+      - name: Descargar proyecto
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Instalar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Configurar aplicación
+        run: |
+          node -e '
+          const fs = require("fs");
+          const p = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          p.dependencies = p.dependencies || {};
+          p.devDependencies = p.devDependencies || {};
+          p.dependencies["@capacitor/core"] = p.dependencies["@capacitor/core"] || "^7.0.0";
+          p.devDependencies["@capacitor/cli"] = p.devDependencies["@capacitor/cli"] || "^7.0.0";
+          p.dependencies["@capacitor/android"] = p.dependencies["@capacitor/android"] || "^7.0.0";
+          fs.writeFileSync("package.json", JSON.stringify(p, null, 2));
+          '
+
+          npm install
+
+          node -e '
+          const fs = require("fs");
+          const c = {
+            appId: process.env.APP_ID,
+            appName: process.env.APP_NAME,
+            webDir: "www",
+            server: {
+              url: process.env.APP_URL,
+              cleartext: false
+            }
+          };
+          fs.writeFileSync("capacitor.config.json", JSON.stringify(c, null, 2));
+          '
+        env:
+          APP_ID: ${{ matrix.app_id }}
+          APP_NAME: ${{ matrix.app_name }}
+          APP_URL: ${{ matrix.url }}
+
+      - name: Crear plataforma Android
+        run: npx cap add android
+
+      - name: Compilar APK
+        run: |
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Guardar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TVMovies-${{ matrix.variant }}-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+
+  windows:
+    name: Crear versión portable para PC
+    runs-on: windows-latest
+
+    steps:
+      - name: Descargar proyecto
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Preparar aplicación
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force www | Out-Null
+
+          @'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>TVMovies PC</title>
+            <style>
+              html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+              iframe { width: 100%; height: 100%; border: 0; }
+            </style>
+          </head>
+          <body>
+            <iframe src="https://playtvmoviesforpc.netlify.app/"></iframe>
+          </body>
+          </html>
+          '@ | Set-Content -Encoding UTF8 www/index.html
+
+          @'
+          {
+            "name": "tvmovies-pc",
+            "version": "1.0.0",
+            "description": "TVMovies PC",
+            "main": "main.js",
+            "scripts": {
+              "start": "electron .",
+              "dist": "electron-builder --win portable"
+            },
+            "devDependencies": {
+              "electron": "^35.0.0",
+              "electron-builder": "^26.0.0"
+            },
+            "build": {
+              "appId": "com.tvmovies.pc",
+              "productName": "TVMovies PC",
+              "win": {
+                "target": ["portable"]
+              }
+            }
+          }
+          '@ | Set-Content -Encoding UTF8 package.json
+
+          @'
+          const { app, BrowserWindow } = require("electron");
+          const path = require("path");
+
+          app.whenReady().then(() => {
+            const win = new BrowserWindow({
+              width: 1280,
+              height: 800,
+              autoHideMenuBar: true,
+              webPreferences: {
+                contextIsolation: true,
+                nodeIntegration: false
+              }
+            });
+
+            win.loadFile(path.join(__dirname, "www", "index.html"));
+          });
+          '@ | Set-Content -Encoding UTF8 main.js
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Compilar EXE portable
+        run: npm run dist
+
+      - name: Guardar EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: TVMovies-PC-Portable
+          path: dist/*.exe
+          retention-days: 7
