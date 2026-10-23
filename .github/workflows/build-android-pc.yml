@@ -1,4 +1,4 @@
-name: Build TVMovies Android y PC
+name: TVMovies Android y PC
 
 on:
   workflow_dispatch:
@@ -7,28 +7,15 @@ permissions:
   contents: read
 
 jobs:
-  android:
-    name: Compilar APK Android
+  android-mobile:
+    name: TVMovies Android
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        include:
-          - variant: mobile
-            app_name: TVMovies
-            app_id: com.tvmovies.mobile
-            url: https://playtvmoviesformobile.duckdns.org/
-
-          - variant: tv
-            app_name: TVMovies TV
-            app_id: com.tvmovies.tv
-            url: https://playtvmoviesfortv.duckdns.org/
-
     steps:
-      - name: Descargar proyecto
+      - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js
+      - name: Configurar Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -42,48 +29,57 @@ jobs:
       - name: Instalar Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Instalar dependencias
-        run: npm install
-
-      - name: Configurar aplicación
+      - name: Preparar proyecto independiente
         run: |
-          node -e '
-          const fs = require("fs");
-          const p = JSON.parse(fs.readFileSync("package.json", "utf8"));
-          p.dependencies = p.dependencies || {};
-          p.devDependencies = p.devDependencies || {};
-          p.dependencies["@capacitor/core"] = p.dependencies["@capacitor/core"] || "^7.0.0";
-          p.devDependencies["@capacitor/cli"] = p.devDependencies["@capacitor/cli"] || "^7.0.0";
-          p.dependencies["@capacitor/android"] = p.dependencies["@capacitor/android"] || "^7.0.0";
-          fs.writeFileSync("package.json", JSON.stringify(p, null, 2));
-          '
+          mkdir -p www
+          cat > www/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="theme-color" content="#000000">
+            <title>TVMovies</title>
+          </head>
+          <body style="margin:0;background:#000;color:white">
+            <script>
+              location.replace(
+                "https://playtvmoviesformobile.duckdns.org/"
+              );
+            </script>
+          </body>
+          </html>
+          EOF
+
+          cat > package.json <<'EOF'
+          {
+            "name": "tvmovies-android-build",
+            "version": "1.0.0",
+            "private": true,
+            "dependencies": {
+              "@capacitor/core": "^7.0.0",
+              "@capacitor/android": "^7.0.0"
+            },
+            "devDependencies": {
+              "@capacitor/cli": "^7.0.0"
+            }
+          }
+          EOF
+
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.tvmovies.mobile",
+            "appName": "TVMovies",
+            "webDir": "www"
+          }
+          EOF
 
           npm install
-
-          node -e '
-          const fs = require("fs");
-          const c = {
-            appId: process.env.APP_ID,
-            appName: process.env.APP_NAME,
-            webDir: "www",
-            server: {
-              url: process.env.APP_URL,
-              cleartext: false
-            }
-          };
-          fs.writeFileSync("capacitor.config.json", JSON.stringify(c, null, 2));
-          '
-        env:
-          APP_ID: ${{ matrix.app_id }}
-          APP_NAME: ${{ matrix.app_name }}
-          APP_URL: ${{ matrix.url }}
-
-      - name: Crear plataforma Android
-        run: npx cap add android
+          npx cap add android
+          npx cap sync android
 
       - name: Compilar APK
         run: |
-          npx cap sync android
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
@@ -91,19 +87,103 @@ jobs:
       - name: Guardar APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVMovies-${{ matrix.variant }}-APK
+          name: TVMovies-Android-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+
+  android-tv:
+    name: TVMovies Android TV
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Instalar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Preparar proyecto TV
+        run: |
+          mkdir -p www
+
+          cat > www/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>TVMovies TV</title>
+          </head>
+          <body style="margin:0;background:#000;color:white">
+            <script>
+              location.replace(
+                "https://playtvmoviesfortv.duckdns.org/"
+              );
+            </script>
+          </body>
+          </html>
+          EOF
+
+          cat > package.json <<'EOF'
+          {
+            "name": "tvmovies-tv-build",
+            "version": "1.0.0",
+            "private": true,
+            "dependencies": {
+              "@capacitor/core": "^7.0.0",
+              "@capacitor/android": "^7.0.0"
+            },
+            "devDependencies": {
+              "@capacitor/cli": "^7.0.0"
+            }
+          }
+          EOF
+
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.tvmovies.tv",
+            "appName": "TVMovies TV",
+            "webDir": "www"
+          }
+          EOF
+
+          npm install
+          npx cap add android
+          npx cap sync android
+
+      - name: Compilar APK TV
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Guardar APK TV
+        uses: actions/upload-artifact@v4
+        with:
+          name: TVMovies-TV-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
 
   windows:
-    name: Crear versión portable para PC
+    name: TVMovies PC portable
     runs-on: windows-latest
 
     steps:
-      - name: Descargar proyecto
+      - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js
+      - name: Configurar Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -118,15 +198,14 @@ jobs:
           <html>
           <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>TVMovies PC</title>
-            <style>
-              html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
-              iframe { width: 100%; height: 100%; border: 0; }
-            </style>
           </head>
-          <body>
-            <iframe src="https://playtvmoviesforpc.netlify.app/"></iframe>
+          <body style="margin:0">
+            <script>
+              location.replace(
+                "https://playtvmoviesforpc.netlify.app/"
+              );
+            </script>
           </body>
           </html>
           '@ | Set-Content -Encoding UTF8 www/index.html
@@ -135,10 +214,9 @@ jobs:
           {
             "name": "tvmovies-pc",
             "version": "1.0.0",
-            "description": "TVMovies PC",
+            "private": true,
             "main": "main.js",
             "scripts": {
-              "start": "electron .",
               "dist": "electron-builder --win portable"
             },
             "devDependencies": {
@@ -157,27 +235,24 @@ jobs:
 
           @'
           const { app, BrowserWindow } = require("electron");
-          const path = require("path");
 
           app.whenReady().then(() => {
             const win = new BrowserWindow({
               width: 1280,
               height: 800,
-              autoHideMenuBar: true,
-              webPreferences: {
-                contextIsolation: true,
-                nodeIntegration: false
-              }
+              autoHideMenuBar: true
             });
 
-            win.loadFile(path.join(__dirname, "www", "index.html"));
+            win.loadURL(
+              "https://playtvmoviesforpc.netlify.app/"
+            );
           });
           '@ | Set-Content -Encoding UTF8 main.js
 
       - name: Instalar dependencias
         run: npm install
 
-      - name: Compilar EXE portable
+      - name: Crear EXE portable
         run: npm run dist
 
       - name: Guardar EXE
