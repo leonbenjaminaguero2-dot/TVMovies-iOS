@@ -1,4 +1,4 @@
-name: TVMovies Android y PC
+name: TVMovies - Android, TV y PC
 
 on:
   workflow_dispatch:
@@ -8,14 +8,14 @@ permissions:
 
 jobs:
   android-mobile:
-    name: TVMovies Android
+    name: APK Android móvil
     runs-on: ubuntu-latest
 
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Node
+      - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -26,22 +26,22 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Instalar Android SDK
+      - name: Configurar Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Preparar proyecto independiente
+      - name: Crear aplicación
         run: |
           mkdir -p www
+
           cat > www/index.html <<'EOF'
           <!DOCTYPE html>
           <html>
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta name="theme-color" content="#000000">
             <title>TVMovies</title>
           </head>
-          <body style="margin:0;background:#000;color:white">
+          <body style="margin:0">
             <script>
               location.replace(
                 "https://playtvmoviesformobile.duckdns.org/"
@@ -51,30 +51,11 @@ jobs:
           </html>
           EOF
 
-          cat > package.json <<'EOF'
-          {
-            "name": "tvmovies-android-build",
-            "version": "1.0.0",
-            "private": true,
-            "dependencies": {
-              "@capacitor/core": "^7.0.0",
-              "@capacitor/android": "^7.0.0"
-            },
-            "devDependencies": {
-              "@capacitor/cli": "^7.0.0"
-            }
-          }
-          EOF
+          npm init -y
+          npm install @capacitor/core@7 @capacitor/android@7
+          npm install --save-dev @capacitor/cli@7
 
-          cat > capacitor.config.json <<'EOF'
-          {
-            "appId": "com.tvmovies.mobile",
-            "appName": "TVMovies",
-            "webDir": "www"
-          }
-          EOF
-
-          npm install
+          npx cap init TVMovies com.tvmovies.mobile --web-dir www
           npx cap add android
           npx cap sync android
 
@@ -87,19 +68,19 @@ jobs:
       - name: Guardar APK
         uses: actions/upload-artifact@v4
         with:
-          name: TVMovies-Android-APK
+          name: TVMovies-Android
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
 
   android-tv:
-    name: TVMovies Android TV
+    name: APK Android TV
     runs-on: ubuntu-latest
 
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Node
+      - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -110,10 +91,10 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Instalar Android SDK
+      - name: Configurar Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Preparar proyecto TV
+      - name: Crear aplicación TV
         run: |
           mkdir -p www
 
@@ -125,7 +106,7 @@ jobs:
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>TVMovies TV</title>
           </head>
-          <body style="margin:0;background:#000;color:white">
+          <body style="margin:0">
             <script>
               location.replace(
                 "https://playtvmoviesfortv.duckdns.org/"
@@ -135,30 +116,11 @@ jobs:
           </html>
           EOF
 
-          cat > package.json <<'EOF'
-          {
-            "name": "tvmovies-tv-build",
-            "version": "1.0.0",
-            "private": true,
-            "dependencies": {
-              "@capacitor/core": "^7.0.0",
-              "@capacitor/android": "^7.0.0"
-            },
-            "devDependencies": {
-              "@capacitor/cli": "^7.0.0"
-            }
-          }
-          EOF
+          npm init -y
+          npm install @capacitor/core@7 @capacitor/android@7
+          npm install --save-dev @capacitor/cli@7
 
-          cat > capacitor.config.json <<'EOF'
-          {
-            "appId": "com.tvmovies.tv",
-            "appName": "TVMovies TV",
-            "webDir": "www"
-          }
-          EOF
-
-          npm install
+          npx cap init "TVMovies TV" com.tvmovies.tv --web-dir www
           npx cap add android
           npx cap sync android
 
@@ -171,45 +133,26 @@ jobs:
       - name: Guardar APK TV
         uses: actions/upload-artifact@v4
         with:
-          name: TVMovies-TV-APK
+          name: TVMovies-Android-TV
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
 
   windows:
-    name: TVMovies PC portable
+    name: EXE portable para Windows
     runs-on: windows-latest
 
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Node
+      - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Preparar aplicación
+      - name: Crear aplicación
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force www | Out-Null
-
-          @'
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="UTF-8">
-            <title>TVMovies PC</title>
-          </head>
-          <body style="margin:0">
-            <script>
-              location.replace(
-                "https://playtvmoviesforpc.netlify.app/"
-              );
-            </script>
-          </body>
-          </html>
-          '@ | Set-Content -Encoding UTF8 www/index.html
-
           @'
           {
             "name": "tvmovies-pc",
@@ -231,7 +174,7 @@ jobs:
               }
             }
           }
-          '@ | Set-Content -Encoding UTF8 package.json
+          '@ | Set-Content -Encoding utf8 package.json
 
           @'
           const { app, BrowserWindow } = require("electron");
@@ -247,15 +190,15 @@ jobs:
               "https://playtvmoviesforpc.netlify.app/"
             );
           });
-          '@ | Set-Content -Encoding UTF8 main.js
+          '@ | Set-Content -Encoding utf8 main.js
 
       - name: Instalar dependencias
         run: npm install
 
-      - name: Crear EXE portable
+      - name: Compilar EXE
         run: npm run dist
 
-      - name: Guardar EXE
+      - name: Guardar EXE portable
         uses: actions/upload-artifact@v4
         with:
           name: TVMovies-PC-Portable
