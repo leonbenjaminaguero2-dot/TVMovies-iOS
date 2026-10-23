@@ -29,11 +29,9 @@ jobs:
         run: npm install --no-save @capacitor/assets
 
       - name: Generar iconos
-        run: |
-          test -f assets/icon.png
-          npx capacitor-assets generate --ios
+        run: npx capacitor-assets generate --ios
 
-      - name: Configurar pantalla completa
+      - name: Ocultar barra de estado
         run: |
           /usr/libexec/PlistBuddy -c "Add :UIViewControllerBasedStatusBarAppearance bool false" ios/App/App/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :UIStatusBarHidden bool true" ios/App/App/Info.plist || /usr/libexec/PlistBuddy -c "Set :UIStatusBarHidden true" ios/App/App/Info.plist
