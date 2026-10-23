@@ -1,0 +1,9 @@
+{
+  "appId": "com.tvmovies.mobile",
+  "appName": "TVMovies",
+  "webDir": "www",
+  "server": {
+    "url": "https://playtvmoviesformobile.duckdns.org/",
+    "cleartext": false
+  }
+}
