@@ -1,4 +1,3 @@
-```yaml
 name: Build TVMovies IPA
 
 on:
@@ -23,17 +22,24 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
+      - name: Crear proyecto iOS
+        run: npx cap add ios
+
       - name: Instalar generador de iconos
         run: npm install --no-save @capacitor/assets
 
       - name: Generar iconos
         run: |
-          mkdir -p assets
           test -f assets/icon.png
           npx capacitor-assets generate --ios
 
-      - name: Crear proyecto iOS
-        run: npx cap add ios
+      - name: Configurar pantalla completa
+        run: |
+          /usr/libexec/PlistBuddy -c "Add :UIViewControllerBasedStatusBarAppearance bool false" ios/App/App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :UIStatusBarHidden bool true" ios/App/App/Info.plist || /usr/libexec/PlistBuddy -c "Set :UIStatusBarHidden true" ios/App/App/Info.plist
+
+      - name: Sincronizar proyecto
+        run: npx cap sync ios
 
       - name: Compilar aplicación
         run: |
@@ -59,4 +65,3 @@ jobs:
           name: TVMovies-IPA
           path: TVMovies.ipa
           retention-days: 7
-```
