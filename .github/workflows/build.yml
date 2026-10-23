@@ -1,3 +1,4 @@
+```yaml
 name: Build TVMovies IPA
 
 on:
@@ -9,6 +10,7 @@ permissions:
 jobs:
   build:
     runs-on: macos-15
+
     steps:
       - name: Descargar proyecto
         uses: actions/checkout@v4
@@ -20,6 +22,15 @@ jobs:
 
       - name: Instalar dependencias
         run: npm install
+
+      - name: Instalar generador de iconos
+        run: npm install --no-save @capacitor/assets
+
+      - name: Generar iconos
+        run: |
+          mkdir -p assets
+          test -f assets/icon.png
+          npx capacitor-assets generate --ios
 
       - name: Crear proyecto iOS
         run: npx cap add ios
@@ -40,7 +51,7 @@ jobs:
         run: |
           mkdir -p Payload
           cp -R ios/App/build/Build/Products/Release-iphoneos/App.app Payload/
-          zip -r TVMovies.ipa Payload
+          /usr/bin/zip -r TVMovies.ipa Payload
 
       - name: Guardar IPA
         uses: actions/upload-artifact@v4
@@ -48,3 +59,4 @@ jobs:
           name: TVMovies-IPA
           path: TVMovies.ipa
           retention-days: 7
+```
